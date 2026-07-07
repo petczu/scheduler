@@ -22,11 +22,12 @@ function rollupRoom(): Room
 
 function snapshot(Room $room, string $slotAt, string $status, string $scannedAt): void
 {
-    static $run = null;
-    $run ??= ScanRun::create([
-        'scan_source_id' => ScanSource::create([
-            'venue_id' => $room->venue_id, 'name' => 'S', 'url' => 'https://x', 'strategy' => 'generic',
-        ])->id,
+    $source = ScanSource::firstOrCreate(
+        ['venue_id' => $room->venue_id, 'name' => 'S'],
+        ['url' => 'https://x', 'strategy' => 'generic'],
+    );
+    $run = ScanRun::create([
+        'scan_source_id' => $source->id,
         'status' => 'success',
         'started_at' => now(),
     ]);

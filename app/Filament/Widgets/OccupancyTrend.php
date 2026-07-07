@@ -34,6 +34,10 @@ class OccupancyTrend extends ChartWidget
             ->join('groups as g', 'g.id', '=', 'v.group_id')
             ->where('d.date', '>=', $since)
             ->whereNotNull('d.occupancy')
+            // Exclude rooms currently active-off or on maintenance, matching
+            // Room::counted() used elsewhere — their downtime isn't demand.
+            ->where('r.is_active', true)
+            ->where('r.under_maintenance', false)
             ->groupBy('d.date', 'g.is_ours')
             ->selectRaw('d.date, g.is_ours, ROUND(AVG(d.occupancy)) as occ')
             ->get();
@@ -41,13 +45,13 @@ class OccupancyTrend extends ChartWidget
         $dates = collect(range(0, 29))
             ->map(fn ($i) => Carbon::parse($since, 'Asia/Dubai')->addDays($i)->toDateString());
 
-        $ours = $dates->map(fn ($date) => optional($rows->first(
-            fn ($r) => $r->date === $date && (int) $r->is_ours === 1
-        ))->occ);
+        // $r->date may come back as 'Y-m-d' (MySQL DATE) or 'Y-m-d H:i:s'
+        // depending on the driver; compare on the date part only.
+        $onDate = fn ($r, $date, $ours) => substr((string) $r->date, 0, 10) === $date
+            && (int) $r->is_ours === $ours;
 
-        $competitors = $dates->map(fn ($date) => optional($rows->first(
-            fn ($r) => $r->date === $date && (int) $r->is_ours === 0
-        ))->occ);
+        $ours = $dates->map(fn ($date) => optional($rows->first(fn ($r) => $onDate($r, $date, 1)))->occ);
+        $competitors = $dates->map(fn ($date) => optional($rows->first(fn ($r) => $onDate($r, $date, 0)))->occ);
 
         return [
             'datasets' => [

@@ -20,12 +20,8 @@ class DailyRoomStat extends Model
         'pm_sold_out',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'date' => 'date',
-        ];
-    }
+    // `date` is kept as a plain 'Y-m-d' string (no datetime cast) so exact
+    // date matching is consistent across MySQL (DATE) and SQLite (tests).
 
     public function room(): BelongsTo
     {
