@@ -45,6 +45,22 @@ class TelegramWebhook extends Command
         }
 
         $base = rtrim($this->argument('baseUrl') ?: (string) config('app.url'), '/');
+
+        // Telegram requires HTTPS. Upgrade http:// automatically.
+        $base = preg_replace('#^http://#i', 'https://', $base);
+        if (! str_starts_with($base, 'https://')) {
+            $base = 'https://'.ltrim($base, '/');
+        }
+
+        $host = parse_url($base, PHP_URL_HOST) ?: '';
+        if ($host === '' || $host === 'localhost' || str_ends_with($host, '.test') || str_ends_with($host, '.local')) {
+            $this->error("\"{$base}\" is not a public HTTPS host Telegram can reach.");
+            $this->line('Set APP_URL to your public domain in .env, or pass it explicitly:');
+            $this->line('  php artisan telegram:webhook set https://your-domain.com');
+
+            return self::FAILURE;
+        }
+
         $url = "{$base}/telegram/webhook/{$secret}";
 
         $client->setWebhook($url, $secret);
