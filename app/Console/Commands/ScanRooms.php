@@ -11,6 +11,7 @@ class ScanRooms extends Command
     protected $signature = 'scan:run
         {--source= : Scan a single source by id}
         {--group= : Scan only sources whose venue belongs to this group id}
+        {--fetcher= : Scan only sources using this fetcher (http|scrapfly)}
         {--sync : Run scans immediately instead of queueing}';
 
     protected $description = 'Dispatch availability scans for all active scan sources';
@@ -21,6 +22,7 @@ class ScanRooms extends Command
             ->where('is_active', true)
             ->whereHas('venue', fn ($q) => $q->where('is_active', true))
             ->when($this->option('source'), fn ($q, $id) => $q->whereKey($id))
+            ->when($this->option('fetcher'), fn ($q, $fetcher) => $q->where('fetcher', $fetcher))
             ->when($this->option('group'), fn ($q, $groupId) => $q->whereHas(
                 'venue', fn ($v) => $v->where('group_id', $groupId)
             ))
