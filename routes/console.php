@@ -4,10 +4,14 @@ use Illuminate\Support\Facades\Schedule;
 
 // Scan all active rooms every hour during business hours (Dubai time).
 // Frequent scans are what let us detect fake bookings (sold_out -> available).
-Schedule::command('scan:run')
+// Runs synchronously (no queue worker required) and in the background so it
+// never blocks the per-minute scheduler.
+Schedule::command('scan:run --sync')
     ->hourly()
     ->timezone('Asia/Dubai')
-    ->between('09:00', '23:59');
+    ->between('09:00', '23:59')
+    ->runInBackground()
+    ->withoutOverlapping();
 
 // Event alerts run a few minutes after each scan, on fresh data.
 Schedule::command('telegram:alerts')
