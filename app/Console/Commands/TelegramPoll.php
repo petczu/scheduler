@@ -26,6 +26,14 @@ class TelegramPoll extends Command
             return self::SUCCESS;
         }
 
+        // A webhook and getUpdates are mutually exclusive (Telegram returns
+        // 409). When a webhook secret is configured, webhook mode is assumed.
+        if (filled(config('services.telegram.webhook_secret'))) {
+            $this->warn('Webhook mode (TELEGRAM_WEBHOOK_SECRET set); skipping polling.');
+
+            return self::SUCCESS;
+        }
+
         $offset = (int) Cache::get('telegram:update_offset', 0);
         $updates = $client->getUpdates($offset);
         $processed = 0;

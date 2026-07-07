@@ -25,7 +25,8 @@ Schedule::command('telegram:digest evening')
     ->timezone('Asia/Dubai');
 
 // Process incoming bot updates (onboarding, phone verification).
-// For production, use the webhook route instead of polling.
+// The command no-ops when a webhook secret is set, so this is safe to leave
+// scheduled in both polling and webhook modes.
 Schedule::command('telegram:poll')
     ->everyMinute()
     ->withoutOverlapping();

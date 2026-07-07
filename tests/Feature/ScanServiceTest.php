@@ -288,6 +288,9 @@ it('does not infer a booking when the disappeared slot is already in the past', 
 it('detects released slots (fake bookings) across multiple scans', function () {
     Storage::fake('local');
 
+    // Freeze at a fixed morning time so a +1h travel can't cross midnight.
+    $this->travelTo(now('Asia/Dubai')->setTime(9, 0));
+
     $source = makeSource();
     $room = Room::create([
         'venue_id' => $source->venue_id,
@@ -316,4 +319,6 @@ it('detects released slots (fake bookings) across multiple scans', function () {
     expect($stats['total'])->toBe(1)
         ->and($stats['sold_out'])->toBe(0)
         ->and($stats['released'])->toBe(1);
+
+    $this->travelBack();
 });

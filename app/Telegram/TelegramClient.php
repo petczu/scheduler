@@ -67,6 +67,27 @@ class TelegramClient
         ]), 'result', []);
     }
 
+    public function setWebhook(string $url, ?string $secretToken = null): array
+    {
+        $payload = ['url' => $url, 'allowed_updates' => json_encode(['message'])];
+
+        if (filled($secretToken)) {
+            $payload['secret_token'] = $secretToken;
+        }
+
+        return $this->call('setWebhook', $payload);
+    }
+
+    public function deleteWebhook(): array
+    {
+        return $this->call('deleteWebhook', ['drop_pending_updates' => 'false']);
+    }
+
+    public function getWebhookInfo(): array
+    {
+        return $this->call('getWebhookInfo', []);
+    }
+
     private function call(string $method, array $payload): array
     {
         $token = config('services.telegram.token');
