@@ -40,3 +40,21 @@ it('excludes maintenance rooms from the occupancy trend', function () {
     expect($data['datasets'][0]['label'])->toBe('Our projects')
         ->and((int) $data['datasets'][0]['data'][$idx])->toBe(40);
 });
+
+it('weights occupancy by slot count, not per-room average', function () {
+    $group = Group::create(['name' => 'Ours', 'is_ours' => true]);
+    $venue = Venue::create(['group_id' => $group->id, 'name' => 'V', 'timezone' => 'Asia/Dubai']);
+
+    $small = Room::create(['venue_id' => $venue->id, 'name' => 'Small']);
+    $big = Room::create(['venue_id' => $venue->id, 'name' => 'Big']);
+
+    $date = CarbonImmutable::now('Asia/Dubai')->toDateString();
+    // Small: 2/2 = 100%; Big: 0/18 = 0%. Simple avg = 50%, weighted = 2/20 = 10%.
+    DailyRoomStat::create(['room_id' => $small->id, 'date' => $date, 'slots_total' => 2, 'sold_out' => 2, 'occupancy' => 100]);
+    DailyRoomStat::create(['room_id' => $big->id, 'date' => $date, 'slots_total' => 18, 'sold_out' => 0, 'occupancy' => 0]);
+
+    $data = trendData();
+    $idx = array_search(CarbonImmutable::now('Asia/Dubai')->format('d M'), $data['labels'], true);
+
+    expect((int) $data['datasets'][0]['data'][$idx])->toBe(10);
+});

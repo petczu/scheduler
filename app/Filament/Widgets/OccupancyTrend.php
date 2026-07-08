@@ -39,7 +39,10 @@ class OccupancyTrend extends ChartWidget
             ->where('r.is_active', true)
             ->where('r.under_maintenance', false)
             ->groupBy('d.date', 'g.is_ours')
-            ->selectRaw('d.date, g.is_ours, ROUND(AVG(d.occupancy)) as occ')
+            // Weighted occupancy: total booked slots / total slots for the
+            // group (matches the digest's per-venue math, not an average of
+            // per-room percentages).
+            ->selectRaw('d.date, g.is_ours, ROUND(SUM(d.sold_out) * 100.0 / NULLIF(SUM(d.slots_total), 0)) as occ')
             ->get();
 
         $dates = collect(range(0, 29))
