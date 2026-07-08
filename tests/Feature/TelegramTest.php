@@ -14,6 +14,17 @@ use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
+// Freeze at 07:00 Dubai so the seeded slots (10:00+) are still upcoming and
+// therefore count toward occupancy (a slot only counts if it was booked while
+// still bookable).
+beforeEach(function () {
+    $this->travelTo(now('Asia/Dubai')->setTime(7, 0));
+});
+
+afterEach(function () {
+    $this->travelBack();
+});
+
 function enableTelegram(): void
 {
     config()->set('services.telegram.enabled', true);

@@ -37,6 +37,8 @@ function snapshot(Room $room, string $slotAt, string $status, string $scannedAt)
         'scan_run_id' => $run->id,
         'slot_at' => $slotAt,
         'status' => $status,
+        // scanned_at is stored/compared as UTC (like now() in production);
+        // callers pass UTC times before the slot's real (Dubai) start.
         'scanned_at' => $scannedAt,
     ]);
 }
@@ -45,10 +47,11 @@ it('rolls a day of snapshots into one compact stat row', function () {
     $room = rollupRoom();
     $day = '2026-07-01';
 
-    // 10:00 morning slot ends sold out; 20:00 evening slot available.
-    snapshot($room, "{$day} 10:00:00", 'available', "{$day} 08:00:00");
-    snapshot($room, "{$day} 10:00:00", 'sold_out', "{$day} 09:00:00");
-    snapshot($room, "{$day} 20:00:00", 'available', "{$day} 09:00:00");
+    // scanned_at is UTC; the slots start at Dubai 10:00 (UTC 06:00) and
+    // 20:00 (UTC 16:00), so these scans are all before the slot starts.
+    snapshot($room, "{$day} 10:00:00", 'available', "{$day} 03:00:00");
+    snapshot($room, "{$day} 10:00:00", 'sold_out', "{$day} 04:00:00");
+    snapshot($room, "{$day} 20:00:00", 'available', "{$day} 04:00:00");
 
     $this->artisan('stats:rollup', ['--date' => $day])->assertSuccessful();
 
@@ -67,7 +70,7 @@ it('rolls a day of snapshots into one compact stat row', function () {
 it('is idempotent (re-running updates, not duplicates)', function () {
     $room = rollupRoom();
     $day = '2026-07-01';
-    snapshot($room, "{$day} 12:00:00", 'sold_out', "{$day} 09:00:00");
+    snapshot($room, "{$day} 12:00:00", 'sold_out', "{$day} 04:00:00");
 
     $this->artisan('stats:rollup', ['--date' => $day]);
     $this->artisan('stats:rollup', ['--date' => $day]);
@@ -78,9 +81,9 @@ it('is idempotent (re-running updates, not duplicates)', function () {
 it('records a released (fake booking) count', function () {
     $room = rollupRoom();
     $day = '2026-07-01';
-    // sold out then available again on a slot -> released.
-    snapshot($room, "{$day} 15:00:00", 'sold_out', "{$day} 08:00:00");
-    snapshot($room, "{$day} 15:00:00", 'available', "{$day} 09:00:00");
+    // sold out then available again while still bookable -> released.
+    snapshot($room, "{$day} 15:00:00", 'sold_out', "{$day} 04:00:00");
+    snapshot($room, "{$day} 15:00:00", 'available', "{$day} 05:00:00");
 
     $this->artisan('stats:rollup', ['--date' => $day]);
 

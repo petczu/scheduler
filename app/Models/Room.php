@@ -73,9 +73,15 @@ class Room extends Model
     /**
      * Occupancy for a given venue-local day, based on that day's scans.
      *
-     * - total/sold_out/occupancy reflect the LATEST reading per slot;
-     * - released counts slots seen sold_out earlier and available later
-     *   (a likely fake booking or cancellation);
+     * IMPORTANT: a slot only counts as booked if it was sold out WHILE STILL
+     * BOOKABLE — i.e. at the last scan taken before its start time. On many
+     * sites a past slot is shown as "disabled"/sold-out simply because its
+     * time has passed; those are ignored (they are not real bookings). Slots
+     * we never observed while they were still upcoming are excluded entirely.
+     *
+     * - occupancy = booked / observed slots (latest pre-start reading);
+     * - released counts slots that went sold-out then free again while still
+     *   bookable (a likely fake booking or cancellation);
      * - am_* / pm_* split slots by start hour (< 17 morning, >= 17 evening).
      *
      * @return array{total:int, sold_out:int, released:int, occupancy:?int,
@@ -83,6 +89,7 @@ class Room extends Model
      */
     public function dayStats(CarbonImmutable $day): array
     {
+        $tz = $this->venue->timezone;
         $day = $day->startOfDay();
 
         $bySlot = $this->slotSnapshots()
@@ -91,13 +98,28 @@ class Room extends Model
             ->get()
             ->groupBy(fn (SlotSnapshot $s) => $s->slot_at->format('H:i'));
 
-        $total = $bySlot->count();
+        $total = 0;
         $soldOut = 0;
         $released = 0;
         $amTotal = $amSold = $pmTotal = $pmSold = 0;
 
         foreach ($bySlot as $time => $history) {
-            $isSold = $history->last()->status === SlotSnapshot::STATUS_SOLD_OUT;
+            // Real start instant of this slot (slot_at is stored venue-local).
+            $slotStart = CarbonImmutable::createFromFormat(
+                'Y-m-d H:i:s',
+                $history->first()->slot_at->format('Y-m-d H:i:s'),
+                $tz,
+            );
+
+            // Only readings taken before the slot started tell us if it was booked.
+            $preStart = $history->filter(fn (SlotSnapshot $s) => $s->scanned_at->lessThan($slotStart));
+
+            if ($preStart->isEmpty()) {
+                continue; // never observed while still bookable → unknown, skip
+            }
+
+            $total++;
+            $isSold = $preStart->last()->status === SlotSnapshot::STATUS_SOLD_OUT;
             $isMorning = (int) substr($time, 0, 2) < 17;
 
             if ($isMorning) {
@@ -113,7 +135,7 @@ class Room extends Model
             }
 
             $wasSold = false;
-            foreach ($history as $snapshot) {
+            foreach ($preStart as $snapshot) {
                 if ($snapshot->status === SlotSnapshot::STATUS_SOLD_OUT) {
                     $wasSold = true;
                 } elseif ($wasSold && $snapshot->status === SlotSnapshot::STATUS_AVAILABLE) {
