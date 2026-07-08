@@ -16,11 +16,13 @@ Schedule::command('scan:run --sync --fetcher=http')
     ->runInBackground()
     ->withoutOverlapping();
 
-// Paid Scrapfly sources (Game Over, Escape The Room): every 15 minutes,
-// around the clock. Higher credit spend, accepted while testing.
+// Paid Scrapfly sources (Game Over, Escape The Room): hourly, business hours
+// only (~30 credits per request). Overnight competitor bookings are rare and
+// not worth the spend; free sources still cover the night. ~94k credits/month.
 Schedule::command('scan:run --sync --fetcher=scrapfly')
-    ->everyFifteenMinutes()
+    ->hourly()
     ->timezone('Asia/Dubai')
+    ->between('09:00', '23:59')
     ->runInBackground()
     ->withoutOverlapping();
 
