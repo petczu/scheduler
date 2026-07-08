@@ -9,14 +9,14 @@ use Filament\Widgets\TableWidget;
 
 class OccupancyToday extends TableWidget
 {
-    protected static ?int $sort = 1;
+    protected static ?int $sort = 3;
 
     protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
         return $table
-            ->heading('Occupancy today')
+            ->heading('Live occupancy — all rooms')
             ->query(
                 Room::query()
                     ->with('venue.group')

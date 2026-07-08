@@ -14,7 +14,7 @@ class OccupancyTrend extends ChartWidget
 {
     protected ?string $heading = 'Occupancy trend (last 30 days)';
 
-    protected static ?int $sort = 2;
+    protected static ?int $sort = 1;
 
     protected int|string|array $columnSpan = 'full';
 
