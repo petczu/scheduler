@@ -39,13 +39,15 @@ Schedule::command('telegram:digest evening')
     ->dailyAt('21:00')
     ->timezone('Asia/Dubai');
 
-// Roll yesterday's raw snapshots into compact daily stats (kept forever for
-// year-scale analysis). Runs after midnight Dubai. --today also captures the
-// current day so trends include it before the next night's rollup.
+// Roll raw snapshots into compact daily stats (kept forever for year-scale
+// analysis). Runs hourly so today's point stays fresh through the day (and
+// yesterday is finalized right after midnight); it also re-rolls yesterday,
+// which is idempotent and cheap.
 Schedule::command('stats:rollup --today')
-    ->dailyAt('00:30')
+    ->hourly()
     ->timezone('Asia/Dubai')
-    ->runInBackground();
+    ->runInBackground()
+    ->withoutOverlapping();
 
 // Process incoming bot updates (onboarding, phone verification).
 // The command no-ops when a webhook secret is set, so this is safe to leave
