@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ScanRun;
 use App\Models\ScanSource;
 use App\Models\TelegramTemplate;
 use App\Telegram\Notifier;
@@ -26,10 +27,39 @@ class SendTelegramAlerts extends Command
         }
 
         $sent += $this->reportScanFailures($notifier);
+        $sent += $this->reportStalledScanning($notifier);
 
         $this->info("Alerts sent: {$sent}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Watchdog: with queued scans, a stopped Horizon (or a stuck scheduler)
+     * would silently halt scanning. Alert if no scan succeeded recently.
+     * Free HTTP sources run every 5 minutes, so 30 minutes of silence is wrong.
+     */
+    protected function reportStalledScanning(Notifier $notifier): int
+    {
+        $threshold = (int) config('services.telegram.stall_minutes', 30);
+
+        $latest = ScanRun::where('status', 'success')->max('finished_at');
+
+        if ($latest === null) {
+            return 0; // nothing scanned yet (fresh install) — not a stall
+        }
+
+        $minutes = (int) abs(CarbonImmutable::parse($latest)->diffInMinutes(now()));
+
+        if ($minutes < $threshold) {
+            return 0;
+        }
+
+        // One alert per stall window (bucketed) so it doesn't repeat hourly forever.
+        $bucket = CarbonImmutable::now()->floorHour()->format('Y-m-d-H');
+        $text = "🚨 <b>Scanning stalled</b>\nNo successful scan for {$minutes} min. Check Horizon / the scheduler.";
+
+        return $notifier->send('alert_stalled', $text, "alert_stalled:{$bucket}") ? 1 : 0;
     }
 
     /**

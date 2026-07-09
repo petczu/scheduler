@@ -6,25 +6,23 @@ use Illuminate\Support\Facades\Schedule;
 // background so it never blocks the per-minute scheduler. Business hours
 // are Dubai time.
 //
-// Free HTTP sources (our sites + most competitors) are scanned around the
-// clock every 5 minutes — free, and lets us observe whether bookings also
-// happen overnight. This is what catches fake bookings (a future slot that
-// briefly disappears).
-Schedule::command('scan:run --sync --fetcher=http')
+// Scans are dispatched to the queue (processed by Horizon): jobs survive a
+// restart, retry on failure, and one failing source doesn't block the rest.
+// ScanSourceJob is unique-per-source, so a backlog never double-scans a source.
+
+// Free HTTP sources (our sites + most competitors), around the clock every
+// 5 minutes — free, and catches fake bookings (a future slot that briefly
+// disappears) and overnight activity.
+Schedule::command('scan:run --fetcher=http')
     ->everyFiveMinutes()
-    ->timezone('Asia/Dubai')
-    ->runInBackground()
-    ->withoutOverlapping();
+    ->timezone('Asia/Dubai');
 
 // Paid Scrapfly sources (Game Over, Escape The Room): hourly, business hours
-// only (~30 credits per request). Overnight competitor bookings are rare and
-// not worth the spend; free sources still cover the night. ~94k credits/month.
-Schedule::command('scan:run --sync --fetcher=scrapfly')
+// only (~30 credits per request). ~94k credits/month.
+Schedule::command('scan:run --fetcher=scrapfly')
     ->hourly()
     ->timezone('Asia/Dubai')
-    ->between('09:00', '23:59')
-    ->runInBackground()
-    ->withoutOverlapping();
+    ->between('09:00', '23:59');
 
 // Event alerts run a few minutes after each scan, on fresh data.
 Schedule::command('telegram:alerts')

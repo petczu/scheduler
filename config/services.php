@@ -41,6 +41,8 @@ return [
         'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
         // Competitor room at/above this today-occupancy % triggers a "selling out" alert.
         'sold_out_threshold' => (int) env('TELEGRAM_SOLD_OUT_THRESHOLD', 80),
+        // Alert if no successful scan for this many minutes (scanning stalled).
+        'stall_minutes' => (int) env('TELEGRAM_STALL_MINUTES', 30),
     ],
 
     'slack' => [
