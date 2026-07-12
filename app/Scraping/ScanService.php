@@ -31,6 +31,13 @@ class ScanService
         try {
             $result = $this->fetcherFor($source)->fetch($source);
 
+            // Timestamp readings with when the page was actually RECEIVED,
+            // not when the job started. A fetch can straddle a slot's start
+            // (job starts 10:14:59, page arrives 10:15:02 with the slot
+            // already disabled as "past") — attributing that reading to
+            // 10:14:59 would count the slot as booked.
+            $fetchedAt = now();
+
             $htmlPath = "scans/{$run->id}.html";
             Storage::put($htmlPath, $result->html);
 
@@ -50,7 +57,7 @@ class ScanService
                     'slot_at' => $slot->slotAt,
                     'status' => $slot->status,
                     'raw_label' => $slot->rawLabel,
-                    'scanned_at' => $run->started_at,
+                    'scanned_at' => $fetchedAt,
                 ]);
             }
 
@@ -146,7 +153,7 @@ class ScanService
                 'slot_at' => $prev->slot_at,
                 'status' => SlotSnapshot::STATUS_SOLD_OUT,
                 'raw_label' => 'inferred: slot disappeared',
-                'scanned_at' => $run->started_at,
+                'scanned_at' => now(),
             ]);
 
             $inferred++;

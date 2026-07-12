@@ -384,6 +384,43 @@ it('does not infer a booking when a slot disappears inside the cutoff window', f
     $this->travelBack();
 });
 
+it('timestamps snapshots with the fetch time, not the job start', function () {
+    Storage::fake('local');
+
+    $today = now('Asia/Dubai')->format('Y-m-d');
+
+    // The scan job starts seconds before a 10:15 slot begins, but the page
+    // arrives 3 minutes later (slow fetch), already showing the slot as
+    // disabled because its time passed. With fetch-time attribution the
+    // reading is post-start and must NOT count the slot as booked.
+    $this->travelTo(now('Asia/Dubai')->setTime(10, 14, 50));
+
+    Http::fake(['example.com/*' => function () use ($today) {
+        test()->travel(3)->minutes(); // fetch finishes at 10:17:50
+
+        return Http::response(<<<HTML
+            <a class="time-slot disabled" data-date="{$today}">10:15</a>
+            <a class="time-slot" data-date="{$today}">20:00</a>
+        HTML);
+    }]);
+
+    $source = makeSource();
+    $source->venue->update(['booking_cutoff_minutes' => 0]);
+
+    app(ScanService::class)->scan($source);
+
+    $room = Room::first();
+    $snap = SlotSnapshot::where('slot_at', "{$today} 10:15:00")->first();
+
+    // Reading is attributed to 10:17:50 (post-start), so the 10:15 slot is
+    // "never observed while bookable" and excluded from stats entirely.
+    expect($snap->scanned_at->gt(now('Asia/Dubai')->setTime(10, 15, 0)->utc()))->toBeTrue()
+        ->and($room->todayStats()['sold_out'])->toBe(0)
+        ->and($room->todayStats()['total'])->toBe(1); // only the 20:00 slot
+
+    $this->travelBack();
+});
+
 it('detects released slots (fake bookings) across multiple scans', function () {
     Storage::fake('local');
 
