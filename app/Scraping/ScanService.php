@@ -133,8 +133,11 @@ class ScanService
                 $source->venue->timezone,
             );
 
-            // Gone because the time already passed → not a booking.
-            if ($slotLocal->lessThanOrEqualTo($venueNow)) {
+            // Gone because the time passed — or because the site closed
+            // online booking shortly before the start (cutoff window) → not
+            // evidence of a booking.
+            $cutoff = $source->venue->booking_cutoff_minutes ?? 0;
+            if ($slotLocal->subMinutes($cutoff)->lessThanOrEqualTo($venueNow)) {
                 continue;
             }
 

@@ -74,12 +74,19 @@ class Room extends Model
      * Occupancy for a given venue-local day, based on that day's scans.
      *
      * IMPORTANT: a slot only counts as booked if it was sold out WHILE STILL
-     * BOOKABLE — i.e. at the last scan taken before its start time. On many
-     * sites a past slot is shown as "disabled"/sold-out simply because its
-     * time has passed; those are ignored (they are not real bookings). Slots
-     * we never observed while they were still upcoming are excluded entirely.
+     * GENUINELY BOOKABLE. Two traps are excluded:
      *
-     * - occupancy = booked / observed slots (latest pre-start reading);
+     * - past slots: many sites show a passed slot as "disabled"/sold-out
+     *   simply because its time went by;
+     * - the online-booking cutoff: sites close online booking N minutes
+     *   before a slot starts (venue's booking_cutoff_minutes), so readings
+     *   taken inside that window show "disabled" even when nobody booked.
+     *
+     * A slot is therefore judged by the last scan taken BEFORE its cutoff
+     * deadline (start − cutoff). Slots never observed before their deadline
+     * are excluded entirely.
+     *
+     * - occupancy = booked / observed slots (latest pre-deadline reading);
      * - released counts slots that went sold-out then free again while still
      *   bookable (a likely fake booking or cancellation);
      * - am_* / pm_* split slots by start hour (< 17 morning, >= 17 evening).
@@ -90,6 +97,7 @@ class Room extends Model
     public function dayStats(CarbonImmutable $day): array
     {
         $tz = $this->venue->timezone;
+        $cutoff = $this->venue->booking_cutoff_minutes ?? 0;
         $day = $day->startOfDay();
 
         $bySlot = $this->slotSnapshots()
@@ -111,8 +119,10 @@ class Room extends Model
                 $tz,
             );
 
-            // Only readings taken before the slot started tell us if it was booked.
-            $preStart = $history->filter(fn (SlotSnapshot $s) => $s->scanned_at->lessThan($slotStart));
+            // Only readings taken before the online-booking cutoff tell us
+            // whether the slot was actually booked.
+            $deadline = $slotStart->subMinutes($cutoff);
+            $preStart = $history->filter(fn (SlotSnapshot $s) => $s->scanned_at->lessThan($deadline));
 
             if ($preStart->isEmpty()) {
                 continue; // never observed while still bookable → unknown, skip

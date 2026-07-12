@@ -8,12 +8,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Venue extends Model
 {
-    protected $fillable = ['group_id', 'name', 'website_url', 'timezone', 'is_active'];
+    protected $fillable = ['group_id', 'name', 'website_url', 'timezone', 'is_active', 'booking_cutoff_minutes'];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'booking_cutoff_minutes' => 'integer',
         ];
     }
 

@@ -75,8 +75,8 @@ class TelegramTemplate extends Model
             ],
             'digest_row' => [
                 'description' => 'Digest: one venue line',
-                'placeholders' => '{venue} {occupancy} {sold} {total}',
-                'body' => '{venue} — <b>{occupancy}</b> ({sold}/{total})',
+                'placeholders' => '{venue} {occupancy} {sold} {total} {released_note}',
+                'body' => '{venue} — <b>{occupancy}</b> ({sold}/{total}){released_note}',
             ],
             'digest_empty' => [
                 'description' => 'Digest: shown when a section has no data',

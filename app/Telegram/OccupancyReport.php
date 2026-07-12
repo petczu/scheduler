@@ -26,11 +26,13 @@ class OccupancyReport
                 return $group->venues->map(function ($venue) use ($group) {
                     $total = 0;
                     $sold = 0;
+                    $released = 0;
 
                     foreach ($venue->rooms as $room) {
                         $stats = $room->todayStats();
                         $total += $stats['total'];
                         $sold += $stats['sold_out'];
+                        $released += $stats['released'];
                     }
 
                     return [
@@ -38,6 +40,7 @@ class OccupancyReport
                         'is_ours' => $group->is_ours,
                         'total' => $total,
                         'sold' => $sold,
+                        'released' => $released,
                         'occupancy' => $total > 0 ? (int) round($sold / $total * 100) : null,
                     ];
                 });
@@ -137,12 +140,16 @@ class OccupancyReport
 
         return $rows->map(function ($row) {
             $pct = $row['occupancy'] === null ? '—' : "{$row['occupancy']}%";
+            $released = $row['released'] ?? 0;
 
             return TelegramTemplate::render('digest_row', [
                 'venue' => $row['venue'],
                 'occupancy' => $pct,
                 'sold' => $row['sold'],
                 'total' => $row['total'],
+                // Non-empty only when bookings were released today, so the
+                // digest explains "site shows fewer than the digest said".
+                'released_note' => $released > 0 ? " · {$released} released" : '',
             ]);
         })->all();
     }

@@ -91,6 +91,10 @@ Some sites (Escape House, Blackout) list only *free* slots — a booked slot sim
 - **Occupancy** — % of today's slots sold out, based on the latest scan.
 - **Released** — a slot was sold out and became available again: a likely fake booking by a competitor.
 
+### Booking cutoff
+
+Sites close online booking some minutes before a slot starts — the slot then shows as disabled (or disappears) even though nobody bought it. Each venue has a **Booking cutoff (minutes)** setting (default 30): readings taken inside that window are ignored, and a slot is judged by the last scan taken *before* start − cutoff. Set it to match each site's real cutoff — too small overcounts (passed slots look booked), too large misses genuine last-minute bookings.
+
 ## Telegram bot
 
 Digests and alerts are delivered to **authorized subscribers** — people who verified their phone number with the bot.

@@ -130,5 +130,24 @@ it('builds a digest naming ours and competitors', function () {
     expect($text)->toContain('Morning digest')
         ->toContain('Our projects')
         ->toContain('Competitors')
-        ->toContain('Rival');
+        ->toContain('Rival')
+        ->not->toContain('released');
+});
+
+it('notes released bookings in the digest row', function () {
+    $room = competitorRoomWithSoldOut(2, 10);
+
+    // One booked slot frees up later: a second scan sees it available again.
+    $slot = $room->slotSnapshots()->where('status', 'sold_out')->first();
+    SlotSnapshot::create([
+        'room_id' => $room->id,
+        'scan_run_id' => $slot->scan_run_id,
+        'slot_at' => $slot->slot_at,
+        'status' => 'available',
+        'scanned_at' => now()->addHour(),
+    ]);
+
+    $text = app(OccupancyReport::class)->digest('morning');
+
+    expect($text)->toContain('· 1 released');
 });

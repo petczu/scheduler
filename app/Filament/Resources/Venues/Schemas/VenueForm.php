@@ -23,6 +23,13 @@ class VenueForm
                 TextInput::make('timezone')
                     ->required()
                     ->default('Asia/Dubai'),
+                TextInput::make('booking_cutoff_minutes')
+                    ->label('Booking cutoff (minutes)')
+                    ->numeric()
+                    ->minValue(0)
+                    ->maxValue(720)
+                    ->default(30)
+                    ->helperText('How long before a slot starts the site closes online booking. Readings inside this window are ignored — a slot disabled there is not counted as booked.'),
                 Toggle::make('is_active')
                     ->required(),
             ]);

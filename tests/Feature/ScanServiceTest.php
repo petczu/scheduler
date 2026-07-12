@@ -285,6 +285,105 @@ it('does not infer a booking when the disappeared slot is already in the past', 
     $this->travelBack();
 });
 
+it('ignores sold-out readings inside the booking cutoff window', function () {
+    Storage::fake('local');
+
+    $this->travelTo(now('Asia/Dubai')->setTime(9, 0));
+
+    $source = makeSource();
+    $source->venue->update(['booking_cutoff_minutes' => 30]);
+    $room = Room::create([
+        'venue_id' => $source->venue_id,
+        'scan_source_id' => $source->id,
+        'name' => 'Test Room',
+    ]);
+    $today = now('Asia/Dubai')->format('Y-m-d');
+
+    $snap = function (string $status, string $scannedAt) use ($source, $room, $today) {
+        $run = ScanRun::create(['scan_source_id' => $source->id, 'status' => 'success', 'started_at' => now()]);
+        SlotSnapshot::create([
+            'room_id' => $room->id,
+            'scan_run_id' => $run->id,
+            'slot_at' => "{$today} 20:00:00",
+            'status' => $status,
+            'scanned_at' => now('Asia/Dubai')->setTimeFromTimeString($scannedAt)->utc(),
+        ]);
+    };
+
+    // Free all day; "sold out" only appears 15 min before start — that's the
+    // site closing online booking, not a customer.
+    $snap('available', '18:00:00');
+    $snap('sold_out', '19:45:00');
+
+    $stats = $room->fresh()->todayStats();
+
+    expect($stats['total'])->toBe(1)
+        ->and($stats['sold_out'])->toBe(0)
+        ->and($stats['released'])->toBe(0);
+
+    $this->travelBack();
+});
+
+it('still counts bookings observed before the cutoff deadline', function () {
+    Storage::fake('local');
+
+    $this->travelTo(now('Asia/Dubai')->setTime(9, 0));
+
+    $source = makeSource();
+    $source->venue->update(['booking_cutoff_minutes' => 30]);
+    $room = Room::create([
+        'venue_id' => $source->venue_id,
+        'scan_source_id' => $source->id,
+        'name' => 'Test Room',
+    ]);
+    $today = now('Asia/Dubai')->format('Y-m-d');
+
+    $run = ScanRun::create(['scan_source_id' => $source->id, 'status' => 'success', 'started_at' => now()]);
+    SlotSnapshot::create([
+        'room_id' => $room->id,
+        'scan_run_id' => $run->id,
+        'slot_at' => "{$today} 20:00:00",
+        'status' => 'sold_out',
+        'scanned_at' => now('Asia/Dubai')->setTimeFromTimeString('14:00:00')->utc(),
+    ]);
+
+    expect($room->fresh()->todayStats()['sold_out'])->toBe(1);
+
+    $this->travelBack();
+});
+
+it('does not infer a booking when a slot disappears inside the cutoff window', function () {
+    Storage::fake('local');
+
+    $source = makeSource([
+        'strategy' => 'json',
+        'available_only' => true,
+        'parser_config' => ['slots_path' => 'availableHours', 'time_key' => 'start'],
+    ]);
+    $source->venue->update(['booking_cutoff_minutes' => 30]);
+
+    $times = ['20:00'];
+    Http::fake(['example.com/*' => function () use (&$times) {
+        return Http::response(json_encode([
+            'availableHours' => array_map(fn ($t) => ['start' => $t], $times),
+        ]));
+    }]);
+
+    // First scan at 19:00 sees the 20:00 slot.
+    $this->travelTo(now('Asia/Dubai')->setTime(19, 0));
+    app(ScanService::class)->scan($source->fresh());
+
+    // At 19:45 the slot vanished — but we're inside the 30-min cutoff, so
+    // this is the site closing online booking, not a booking.
+    $this->travelTo(now('Asia/Dubai')->setTime(19, 45));
+    $times = [];
+    app(ScanService::class)->scan($source->fresh());
+
+    expect(SlotSnapshot::where('status', 'sold_out')->count())->toBe(0);
+
+    $this->travelBack();
+});
+
 it('detects released slots (fake bookings) across multiple scans', function () {
     Storage::fake('local');
 
